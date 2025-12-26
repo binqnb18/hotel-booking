@@ -1,0 +1,367 @@
+// Hotel Booking System - DBML (updated)
+
+Table guests {
+  guest_id bigserial [pk, increment]
+  username varchar(50) [unique]
+  password_hash varchar(255)
+  email varchar(100) [unique, not null]
+  phone varchar(20) [unique, not null]
+  full_name varchar(100)
+  provider varchar(20) [default: 'local', note: "CHECK IN (local, google, otp)"]
+  provider_id varchar(255)
+  avatar_url varchar(500)
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+ Indexes {
+    (email)
+    (phone)
+    (provider, provider_id) [unique, note: 'Partial unique (handled in DB/app)']
+  }
+}
+
+Table staff {
+  staff_id bigserial [pk, increment]
+  username varchar(50) [unique, not null]
+  password_hash varchar(255) [not null]
+  email varchar(100) [unique, not null]
+  phone varchar(20) [unique]
+  full_name varchar(100) [not null]
+  role varchar(20) [not null, note: "CHECK IN (admin, hotel_owner, hotel_staff)"]
+  hotel_id bigint
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Indexes {
+    (email)
+    (role)
+    (hotel_id)
+  }
+}
+
+Table hotels {
+  hotel_id bigserial [pk, increment]
+  owner_id bigint [not null]
+  name varchar(150) [not null]
+  slug varchar(160) [unique, not null]
+  description text
+  address varchar(255) [not null]
+  city varchar(50) [not null]
+  district varchar(50)
+  latitude numeric(10,8)
+  longitude numeric(11,8)
+  star_rating numeric(2,1) [default: 0.0]
+  commission_rate numeric(5,2) [default: 15.00]
+  checkin_time time [default: '14:00:00']
+  checkout_time time [default: '12:00:00']
+  status varchar(20) [default: 'pending', note: "CHECK IN (pending, approved, rejected,suspended)"]
+  images jsonb [default: '[]']
+  amenities jsonb [default: '[]']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Indexes {
+    (city)
+    (status)
+    (owner_id)
+  }
+}
+
+Table room_types {
+  room_type_id bigserial [pk, increment]
+  hotel_id bigint [not null]
+  name varchar(100) [not null]
+  slug varchar(120)
+  description text
+  size_m2 numeric(5,2)
+  max_adults int [default: 2]
+  max_children int [default: 0]
+  bed_config varchar(100)
+  view_type varchar(50)
+  images jsonb [default: '[]']
+  amenities jsonb [default: '[]']
+  default_price numeric(12,2) [not null]
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table physical_rooms {
+  physical_room_id bigserial [pk, increment]
+  hotel_id bigint [not null]
+  room_type_id bigint [not null]
+  room_number varchar(20) [not null]
+  floor varchar(10)
+  status varchar(20) [default: 'available', note: "CHECK IN (available, maintenance, dirty,blocked)"]
+
+  Indexes {
+    (hotel_id)
+    (room_type_id)
+    (room_number, hotel_id) [unique]
+  }
+}
+
+Table room_rates {
+  rate_id bigserial [pk, increment]
+  room_type_id bigint [not null]
+  date date [not null]
+  price numeric(12,2) [not null]
+  is_closed boolean [default: false]
+
+  Indexes {
+    (room_type_id, date) [unique]
+  }
+}
+
+Table room_holds {
+  hold_id bigserial [pk, increment]
+  session_id varchar(100) [not null]
+  guest_id bigint
+  room_type_id bigint [not null]
+  check_in date [not null]
+  check_out date [not null]
+  num_rooms int [not null, default: 1]
+  expires_at timestamptz [not null]
+  created_at timestamptz [default: `now()`]
+
+  Indexes {
+    (session_id)
+    (expires_at)
+    (room_type_id, check_in, check_out)
+  }
+}
+
+Table bookings {
+  booking_id bigserial [pk, increment]
+  booking_code varchar(12) [unique, not null]
+  guest_id bigint [not null]
+  hotel_id bigint [not null]
+  check_in date [not null]
+  check_out date [not null]
+  num_nights int [not null]
+  num_adults int [not null]
+  num_children int [default: 0]
+  subtotal numeric(12,2) [not null]
+  discount_amount numeric(12,2) [default: 0]
+  service_fee numeric(12,2) [default: 0]
+  tax_amount numeric(12,2) [default: 0]
+  total_payable numeric(12,2) [not null]
+  commission_rate numeric(5,2) [default: 15.00]
+  commission_amount numeric(12,2) [not null]
+  hotel_payout numeric(12,2) [not null]
+  payment_type varchar(20) [default: 'pay_now', note: "CHECK IN (pay_now, pay_at_hotel)"]
+  booking_status varchar(50) [default: 'pending_payment']
+  special_requests text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Indexes {
+    (guest_id)
+    (hotel_id)
+  }
+}
+
+Table booking_rooms {
+  booking_room_id bigserial [pk, increment]
+  booking_id bigint [not null]
+  room_type_id bigint [not null]
+  physical_room_id bigint
+  quantity int [not null]
+  price_per_night numeric(12,2) [not null]
+  subtotal numeric(12,2) [not null]
+
+  Indexes {
+    (booking_id)
+  }
+}
+
+Table vouchers {
+  voucher_id bigserial [pk, increment]
+  code varchar(20) [unique, not null]
+  name varchar(100)
+  type varchar(20) [not null, note: "CHECK IN (percentage, fixed)"]
+  value numeric(12,2) [not null]
+  max_discount numeric(12,2)
+  min_booking_amount numeric(12,2)
+  usage_limit int
+  used_count int [default: 0]
+  valid_from timestamptz
+  valid_to timestamptz
+  is_active boolean [default: true]
+  created_at timestamptz [default: `now()`]
+}
+
+Table booking_vouchers {
+  booking_id bigint [pk]
+  voucher_code varchar(20) [pk]
+  discount_amount numeric(12,2) [not null]
+}
+
+Table payments {
+  payment_id bigserial [pk, increment]
+  booking_id bigint [not null]
+  amount numeric(12,2) [not null]
+  method varchar(30) [not null]
+  status varchar(20) [default: 'pending']
+  transaction_id varchar(100)
+  gateway_response jsonb
+  refund_amount numeric(12,2) [default: 0]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+
+  Indexes {
+    (booking_id)
+  }
+}
+
+Table partner_payouts {
+  payout_id bigserial [pk, increment]
+  hotel_id bigint [not null]
+  period_month date [not null]
+  total_commission numeric(12,2) [default: 0]
+  total_payout numeric(12,2) [default: 0]
+  status varchar(20) [default: 'calculated']
+  paid_at timestamptz
+  created_at timestamptz [default: `now()`]
+}
+
+Table payout_items {
+  item_id bigserial [pk, increment]
+  payout_id bigint [not null]
+  booking_id bigint [not null]
+  commission_amount numeric(12,2)
+  payout_amount numeric(12,2)
+}
+
+Table reviews {
+  review_id bigserial [pk, increment]
+  booking_id bigint [unique, not null]
+  hotel_id bigint [not null]
+  guest_id bigint [not null]
+  rating smallint [not null, note: 'CHECK 1-5']
+  comment text
+  images jsonb [default: '[]']
+  is_verified boolean [default: false]
+  status varchar(20) [default: 'published']
+  created_at timestamptz [default: `now()`]
+}
+
+Table hotel_contracts {
+  contract_id bigserial [pk, increment]
+  hotel_id bigint [unique, not null]
+  contract_file varchar(500)
+  business_license_file varchar(500)
+  tax_code varchar(20)
+  bank_account jsonb
+  status varchar(20) [default: 'pending']
+  rejection_reason text
+  approved_by bigint
+  approved_at timestamptz
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table refresh_tokens {
+  refresh_id bigserial [pk, increment]
+  user_type varchar(20) [not null]
+  user_id bigint [not null]
+  token_hash varchar(255) [unique, not null]
+  expires_at timestamptz [not null]
+  revoked boolean [default: false]
+  user_agent varchar(255)
+  ip_address varchar(45)
+  created_at timestamptz [default: `now()`]
+  last_used_at timestamptz
+
+  Indexes {
+    (user_type, user_id)
+    (expires_at)
+  }
+}
+
+Table audit_logs {
+  log_id bigserial [pk, increment]
+  actor_type varchar(20) [not null]
+  actor_id bigint
+  action varchar(50) [not null]
+  resource_type varchar(50)
+  resource_id bigint
+  hotel_id bigint
+  status varchar(20) [not null]
+  message text
+  ip_address varchar(45)
+  user_agent varchar(255)
+  created_at timestamptz [default: `now()`]
+}
+
+Table complaints {
+  complaint_id bigserial [pk, increment]
+  actor_type varchar(20) [not null]
+  actor_id bigint [not null]
+  booking_id bigint
+  review_id bigint
+  payment_id bigint
+  category varchar(20) [not null]
+  status varchar(20) [default: 'open']
+  description text [not null]
+  resolution_note text
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table conversations {
+  conversation_id bigserial [pk, increment]
+  hotel_id bigint
+  guest_id bigint
+  subject varchar(255)
+  last_message_at timestamptz
+  unread_for_guest int [default: 0]
+  unread_for_partner int [default: 0]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table messages {
+  message_id bigserial [pk, increment]
+  conversation_id bigint [not null]
+  sender_type varchar(20) [not null]
+  sender_id bigint
+  content text
+  attachments jsonb [default: '[]']
+  is_read boolean [default: false]
+  created_at timestamptz [default: `now()`]
+}
+
+// Relationships
+Ref: hotels.owner_id > staff.staff_id
+Ref: staff.hotel_id > hotels.hotel_id
+Ref: room_types.hotel_id > hotels.hotel_id
+Ref: physical_rooms.hotel_id > hotels.hotel_id
+Ref: physical_rooms.room_type_id > room_types.room_type_id
+Ref: room_rates.room_type_id > room_types.room_type_id
+Ref: room_holds.guest_id > guests.guest_id
+Ref: room_holds.room_type_id > room_types.room_type_id
+Ref: bookings.guest_id > guests.guest_id
+Ref: bookings.hotel_id > hotels.hotel_id
+Ref: booking_rooms.booking_id > bookings.booking_id
+Ref: booking_rooms.room_type_id > room_types.room_type_id
+Ref: booking_rooms.physical_room_id > physical_rooms.physical_room_id
+Ref: booking_vouchers.booking_id > bookings.booking_id
+Ref: booking_vouchers.voucher_code > vouchers.code
+Ref: payments.booking_id > bookings.booking_id
+Ref: partner_payouts.hotel_id > hotels.hotel_id
+Ref: payout_items.payout_id > partner_payouts.payout_id
+Ref: payout_items.booking_id > bookings.booking_id
+Ref: reviews.booking_id > bookings.booking_id
+Ref: reviews.hotel_id > hotels.hotel_id
+Ref: reviews.guest_id > guests.guest_id
+Ref: hotel_contracts.hotel_id > hotels.hotel_id
+Ref: hotel_contracts.approved_by > staff.staff_id
+Ref: complaints.booking_id > bookings.booking_id
+Ref: complaints.review_id > reviews.review_id
+Ref: complaints.payment_id > payments.payment_id
+Ref: conversations.hotel_id > hotels.hotel_id
+Ref: conversations.guest_id > guests.guest_id
+Ref: messages.conversation_id > conversations.conversation_id
